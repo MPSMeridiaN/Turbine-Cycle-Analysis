@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbine Analytics Suite</title>
+    <title>Turbine Analytics Suite v2.0</title>
     <!-- Load Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
+            /* Dark Theme (Default) */
             --primary-color: #00e676;
             --primary-hover: #00c853;
             --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
@@ -17,6 +18,27 @@
             --glass-border: rgba(255, 255, 255, 0.1);
             --text-main: #f1f5f9;
             --text-muted: #94a3b8;
+            --card-bg: rgba(30, 41, 59, 0.8);
+            --tooltip-bg: rgba(15, 23, 42, 0.95);
+            --panel-bg: rgba(15, 23, 42, 0.98);
+            --shadow-color: rgba(0, 0, 0, 0.5);
+            
+            --transition-speed: 0.4s;
+        }
+
+        /* Light Theme Overrides */
+        [data-theme="light"] {
+            --primary-color: #00a152; /* Darker Green for light mode */
+            --primary-hover: #008141;
+            --bg-gradient: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+            --glass-bg: rgba(255, 255, 255, 0.8);
+            --glass-border: rgba(0, 0, 0, 0.1);
+            --text-main: #102a43;
+            --text-muted: #486581;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --tooltip-bg: rgba(255, 255, 255, 0.98);
+            --panel-bg: rgba(255, 255, 255, 0.98);
+            --shadow-color: rgba(0, 0, 0, 0.15);
         }
 
         body {
@@ -27,6 +49,8 @@
             padding: 40px 20px;
             min-height: 100vh;
             box-sizing: border-box;
+            transition: background 0.5s ease, color 0.5s ease; /* Fade transition for theme */
+            overflow-x: hidden;
         }
 
         .container {
@@ -34,6 +58,7 @@
             margin: 0 auto;
             opacity: 0;
             animation: fadeIn 0.8s ease-out forwards;
+            position: relative;
         }
 
         @keyframes fadeIn {
@@ -41,10 +66,40 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* --- THEME TOGGLE --- */
+        .theme-toggle-wrapper {
+            position: absolute;
+            top: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .theme-btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px var(--shadow-color);
+        }
+
+        .theme-btn:hover {
+            transform: rotate(15deg) scale(1.1);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
         /* --- HEADER --- */
         header {
             text-align: center;
             margin-bottom: 30px; 
+            position: relative;
         }
 
         h1 {
@@ -52,18 +107,21 @@
             font-weight: 200;
             margin: 0 0 10px 0;
             letter-spacing: -1px;
-            background: linear-gradient(to right, #fff, #94a3b8);
+            /* Gradient Text Logic adapted for themes */
+            background: linear-gradient(to right, var(--text-main), var(--text-muted));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            transition: all var(--transition-speed);
         }
 
         p.subtitle {
             color: var(--text-muted);
             font-size: 1rem;
             margin: 0;
+            transition: color var(--transition-speed);
         }
 
-        /* --- INPUT SECTION (Grid Layout) --- */
+        /* --- INPUT SECTION --- */
         .input-section {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -76,16 +134,21 @@
             .input-section { grid-template-columns: 1fr; }
         }
 
-        /* Upload Zone */
-        .upload-area {
+        .upload-area, .paste-area {
             background: var(--glass-bg);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border: 2px dashed var(--glass-border);
+            border: 1px solid var(--glass-border);
             border-radius: 12px; 
             padding: 20px; 
-            text-align: center;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px var(--shadow-color);
+        }
+
+        /* Upload Zone */
+        .upload-area {
+            border: 2px dashed var(--glass-border);
+            text-align: center;
             cursor: pointer;
             position: relative;
             overflow: hidden;
@@ -99,9 +162,8 @@
 
         .upload-area:hover, .upload-area.dragover {
             border-color: var(--primary-color);
-            background: rgba(30, 41, 59, 0.9);
-            transform: scale(1.01);
-            box-shadow: 0 5px 15px rgba(0, 230, 118, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px var(--shadow-color);
         }
 
         .upload-area input[type=file] {
@@ -125,24 +187,8 @@
             color: var(--primary-color);
         }
 
-        .upload-text {
-            font-size: 1rem;
-            font-weight: 500;
-        }
-
-        .upload-subtext {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
         /* Paste Zone */
         .paste-area {
-            background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            padding: 15px;
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -151,7 +197,7 @@
 
         .paste-area textarea {
             flex-grow: 1;
-            background: rgba(0,0,0,0.2);
+            background: rgba(0,0,0,0.05);
             border: 1px solid var(--glass-border);
             border-radius: 8px;
             color: var(--text-main);
@@ -159,10 +205,16 @@
             resize: none;
             font-family: monospace;
             font-size: 0.85rem;
+            transition: background 0.3s, color 0.3s;
+        }
+        
+        .paste-area textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
         }
 
         .paste-btn {
-            background: rgba(255,255,255,0.05);
+            background: rgba(0,0,0,0.05);
             border: 1px solid var(--glass-border);
             color: var(--text-main);
             padding: 8px;
@@ -174,47 +226,34 @@
         }
 
         .paste-btn:hover {
-            background: rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.1);
             border-color: var(--primary-color);
             color: var(--primary-color);
         }
 
-        /* --- FILE INFO BADGE --- */
-        .file-info {
-            text-align: center;
-            margin-bottom: 20px;
-            display: none;
+        /* --- CHART LAYOUT WITH SIDEBAR --- */
+        .analytics-wrapper {
+            display: flex;
+            gap: 20px;
+            position: relative;
+            align-items: flex-start;
         }
-        .file-info.visible {
-            display: block;
-            animation: fadeIn 0.5s;
-        }
-        .info-tag {
-            display: inline-flex;
-            align-items: center;
-            background: rgba(0, 230, 118, 0.1);
-            border: 1px solid rgba(0, 230, 118, 0.2);
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            color: var(--primary-color);
-        }
-        .info-tag i { margin-right: 8px; }
 
-        /* --- CHART CONTAINER --- */
         .chart-wrapper {
+            flex-grow: 1;
             background: var(--glass-bg);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
             border-radius: 16px;
             padding: 20px;
-            box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 20px 40px -5px var(--shadow-color);
             position: relative;
             min-height: 750px;
+            transition: width 0.3s ease;
         }
 
-        /* Floating Buttons */
+        /* Floating Controls */
         .chart-controls {
             position: absolute;
             top: 20px;
@@ -225,10 +264,10 @@
         }
 
         .control-btn {
-            background: rgba(30, 41, 59, 0.8);
+            background: var(--card-bg);
             border: 1px solid var(--glass-border);
             color: var(--text-main);
-            padding: 8px 16px;
+            padding: 6px 14px;
             border-radius: 8px;
             cursor: pointer;
             backdrop-filter: blur(4px);
@@ -236,13 +275,14 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            box-shadow: 0 2px 5px var(--shadow-color);
         }
 
         .control-btn:hover {
-            background: rgba(30, 41, 59, 1);
             border-color: var(--primary-color);
             color: var(--primary-color);
+            transform: translateY(-1px);
         }
 
         #mainChart {
@@ -251,87 +291,154 @@
             border-radius: 8px;
         }
 
-        /* --- CUSTOM TOOLTIP (UPDATED & REFINED) --- */
+        /* --- DATA INSPECTOR SIDEBAR (New Feature) --- */
+        .data-inspector {
+            width: 0;
+            overflow: hidden;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border-left: 1px solid var(--glass-border);
+            border-radius: 16px;
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            z-index: 60;
+            box-shadow: -10px 0 30px var(--shadow-color);
+            transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            opacity: 0;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(20px);
+        }
+
+        .data-inspector.active {
+            width: 320px;
+            opacity: 1;
+            transform: translateX(0);
+            border: 1px solid var(--glass-border);
+        }
+
+        .inspector-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .inspector-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .inspector-time {
+            font-size: 0.8rem;
+            color: var(--primary-color);
+            margin-top: 4px;
+            display: block;
+        }
+
+        .close-inspector {
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: color 0.2s;
+            font-size: 1.2rem;
+            padding: 5px;
+        }
+        .close-inspector:hover { color: var(--text-main); }
+
+        .inspector-body {
+            padding: 10px 0;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .inspector-row {
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        .inspector-row:hover {
+            background: rgba(125,125,125,0.05);
+        }
+
+        .inspector-label {
+            color: var(--text-muted);
+            margin-right: 10px;
+            word-break: break-word;
+        }
+
+        .inspector-value {
+            color: var(--text-main);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .inspector-row::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--row-color, #ccc);
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        /* --- SIMPLIFIED TOOLTIP --- */
         #customTooltip {
             position: absolute;
             pointer-events: none; 
-            background: rgba(10, 15, 30, 0.98); 
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2); /* Brighter border */
-            border-radius: 6px; 
-            padding: 10px; /* Slightly increased padding */
-            color: #ffffff; 
-            font-size: 0.9rem; /* Increased font size */
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
+            background: var(--tooltip-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px; 
+            padding: 12px;
+            color: var(--text-main); 
+            box-shadow: 0 10px 25px var(--shadow-color);
             z-index: 100;
             opacity: 0;
-            transition: opacity 0.2s ease, top 0.1s ease, left 0.1s ease;
-            min-width: 200px; /* Wider minimum width */
-            transform: translate(15px, 15px); 
+            transition: opacity 0.2s ease, transform 0.1s ease;
+            transform: translate(15px, 15px) scale(0.95);
+            min-width: 150px;
         }
 
         #customTooltip.visible {
             opacity: 1;
+            transform: translate(15px, 15px) scale(1);
         }
 
-        .tooltip-header {
+        .tooltip-header-simple {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .tooltip-value-simple {
+            font-size: 1.2rem;
             font-weight: 700;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            padding-bottom: 6px;
-            margin-bottom: 8px;
-            color: #cbd5e1; /* Lighter header text */
-            font-size: 0.9rem;
-            letter-spacing: 0.5px;
+            color: var(--text-main);
+            margin-bottom: 2px;
         }
-
-        .tooltip-row {
+        .tooltip-label-simple {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--primary-color);
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 4px; 
-            padding: 4px 8px;
-            border-radius: 4px;
-            line-height: 1.4; 
-            position: relative;
-            padding-left: 12px; 
-        }
-        
-        /* Color Strip */
-        .tooltip-row::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 4px;
-            bottom: 4px;
-            width: 4px; 
-            background: var(--row-color, #ccc);
-            border-radius: 2px;
+            gap: 6px;
         }
 
-        .tooltip-row.highlight {
-            background: rgba(0, 230, 118, 0.15); 
-            font-weight: 700;
-            border: 1px solid rgba(0, 230, 118, 0.3);
-        }
-
-        .tooltip-label {
-            margin-right: 15px;
-            color: #f8fafc; /* White text */
-            word-break: break-word; /* Ensure long words break */
-            white-space: normal; /* Allow text to wrap */
-            text-align: left;
-            flex-grow: 1; /* Let label take available space */
-        }
-        
-        .tooltip-value {
-            font-variant-numeric: tabular-nums;
-            color: #fff;
-            font-weight: 600;
-            white-space: nowrap;
-            margin-left: auto; /* Push value to the right */
-        }
-
-        /* --- LEGEND MODAL --- */
+        /* --- LEGEND MODAL & CONTROLS FIXED --- */
         .modal {
             display: none; 
             position: fixed; 
@@ -343,7 +450,6 @@
             overflow: hidden; 
             background-color: rgba(0,0,0,0.6); 
             backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
             opacity: 0;
             transition: opacity 0.3s ease;
         }
@@ -354,247 +460,139 @@
         }
 
         .modal-content {
-            background: #1e293b;
+            background: var(--card-bg);
             border: 1px solid var(--glass-border);
-            margin: 5% auto; 
+            color: var(--text-main);
+            margin: 5vh auto; 
             padding: 0;
-            border-radius: 16px;
-            width: 80%; 
-            max-width: 900px;
-            max-height: 80vh;
+            border-radius: 12px;
+            width: 90%; 
+            max-width: 800px;
+            max-height: 85vh; /* Limit height */
             display: flex;
-            flex-direction: column;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            flex-direction: column; /* Stack children */
+            box-shadow: 0 25px 50px var(--shadow-color);
             transform: translateY(-20px);
             transition: transform 0.3s ease;
+            overflow: hidden; /* Prevent overflow of content */
         }
 
         .modal.show .modal-content {
             transform: translateY(0);
         }
 
+        /* Reduced Padding for Header */
         .modal-header {
-            padding: 20px;
+            padding: 12px 20px;
             border-bottom: 1px solid var(--glass-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: rgba(0,0,0,0.1);
+            flex-shrink: 0; /* Prevent header from shrinking */
         }
 
         .modal-header h2 {
             margin: 0;
             font-size: 1.25rem;
-            font-weight: 500;
+            font-weight: 600;
         }
-
-        .close-modal {
-            color: var(--text-muted);
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            line-height: 1;
+        
+        .close-modal { 
+            cursor: pointer; 
+            font-size: 1.2rem; 
+            opacity: 0.7;
+            padding: 5px;
+            transition: opacity 0.2s;
         }
+        .close-modal:hover { opacity: 1; }
 
-        .close-modal:hover {
-            color: var(--text-main);
-        }
-
-        /* Legend Controls */
+        /* Compact Controls */
         .legend-controls {
-            padding: 15px 20px;
-            background: rgba(255,255,255,0.02);
+            padding: 10px 20px;
             border-bottom: 1px solid var(--glass-border);
             display: flex;
-            gap: 15px; 
             align-items: center;
-            flex-wrap: wrap; 
+            width: 100%;
+            box-sizing: border-box;
+            gap: 12px;
+            background: rgba(0,0,0,0.05);
+            flex-shrink: 0; /* Prevent controls from shrinking */
         }
 
         .search-box {
-            flex-grow: 1;
             position: relative;
-            min-width: 200px; 
+            flex-grow: 1; 
         }
 
         .search-box input {
-            width: 100%;
-            background: rgba(255,255,255,0.05);
+            background: rgba(0,0,0,0.1);
             border: 1px solid var(--glass-border);
-            border-radius: 6px;
-            padding: 10px 12px 10px 35px; 
             color: var(--text-main);
-            font-size: 0.9rem;
+            padding: 8px 10px 8px 36px; /* Compact padding */
+            border-radius: 6px;
+            width: 100%; 
             box-sizing: border-box; 
+            font-size: 0.9rem;
+            transition: border 0.2s, background 0.2s;
         }
 
-        .search-box i {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: rgba(125,125,125,0.15);
         }
 
-        .button-group {
+        .legend-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             flex-shrink: 0;
         }
 
-        .action-btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--glass-border);
-            color: var(--text-main);
-            padding: 8px 16px; 
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.2s;
-            white-space: nowrap; 
+        .legend-actions button {
+            min-width: 60px;
+            font-size: 0.8rem;
+            padding: 6px 12px;
         }
 
-        .action-btn:hover {
-            background: rgba(255,255,255,0.1);
-            border-color: var(--primary-color);
-        }
-
+        /* IMPORTANT FIX: Modal Body handles the scroll */
         .modal-body {
-            padding: 20px;
-            overflow-y: auto;
-            flex-grow: 1;
+            flex-grow: 1;        /* Fill remaining space */
+            overflow-y: auto;    /* Scroll vertically if content overflows */
+            min-height: 0;       /* Critical for nested flex scrolling */
+            position: relative;
         }
 
-        /* Grid for Legend Items */
+        /* Grid inside body doesn't scroll, just flows */
         .legend-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
-            gap: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+            gap: 8px;
+            padding: 15px 20px;
         }
 
         .legend-item {
+            background: rgba(125,125,125,0.05);
+            color: var(--text-main);
+            padding: 6px 10px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
-            justify-content: space-between; 
-            padding: 8px 12px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 8px;
-            transition: all 0.2s;
+            cursor: pointer;
             border: 1px solid transparent;
-            user-select: none;
-            position: relative; 
-        }
-
-        .legend-item:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255,255,255,0.1);
-        }
-
-        .legend-item.hidden-item {
-            opacity: 0.5;
-            background: transparent;
-            border: 1px dashed rgba(255,255,255,0.1);
-            color: var(--text-muted);
-        }
-
-        .item-toggle-area {
-            display: flex;
-            align-items: center;
-            flex-grow: 1;
-            cursor: pointer;
-            overflow: hidden;
-        }
-
-        .color-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 12px;
-            flex-shrink: 0;
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
-        }
-
-        .legend-label {
-            font-size: 0.9rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .item-settings-btn {
-            padding: 4px 8px;
-            color: var(--text-muted);
-            cursor: pointer;
-            border-radius: 4px;
-            margin-left: 8px;
-            opacity: 0.6;
-            transition: opacity 0.2s;
-        }
-        
-        .item-settings-btn:hover {
-            opacity: 1;
-            background: rgba(255,255,255,0.1);
-            color: var(--text-main);
-        }
-
-        /* Settings Popover */
-        .settings-popover {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background: #1e293b;
-            border: 1px solid var(--glass-border);
-            padding: 12px;
-            border-radius: 8px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            z-index: 10;
-            display: none;
-            min-width: 180px;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .settings-popover.show {
-            display: flex;
-        }
-
-        .popover-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
             font-size: 0.85rem;
-            color: var(--text-muted);
+            transition: all 0.2s;
         }
+        .legend-item:hover { background: rgba(125,125,125,0.1); }
+        .legend-item.hidden-item { opacity: 0.5; filter: grayscale(1); }
 
-        .style-select {
-            background: rgba(0,0,0,0.2);
-            border: 1px solid var(--glass-border);
-            color: var(--text-main);
-            border-radius: 4px;
-            padding: 4px;
-            font-size: 0.8rem;
-            width: 100px;
-        }
+        /* Custom Scrollbar for Modal Body */
+        .modal-body::-webkit-scrollbar { width: 6px; }
+        .modal-body::-webkit-scrollbar-track { background: transparent; }
+        .modal-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+        .modal-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 
-        input[type="color"] {
-            -webkit-appearance: none;
-            border: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            overflow: hidden;
-            cursor: pointer;
-            padding: 0;
-            background: none;
-        }
-        input[type="color"]::-webkit-color-swatch-wrapper {
-            padding: 0;
-        }
-        input[type="color"]::-webkit-color-swatch {
-            border: 1px solid var(--glass-border);
-            border-radius: 50%;
-        }
-
-        /* Loading Spinner */
+        /* Loader */
         .loader {
             display: none;
             position: absolute;
@@ -610,151 +608,186 @@
             z-index: 20;
         }
 
-        @keyframes spin {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        @keyframes spin { 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        /* File Info Badge */
+        .file-info {
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        .file-info.visible { display: block; }
+        .info-tag {
+            background: rgba(0, 230, 118, 0.1);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
         }
 
     </style>
 </head>
-<body>
+<body data-theme="dark">
 
 <div class="container">
+    
+    <!-- Theme Toggle -->
+    <div class="theme-toggle-wrapper">
+        <button class="theme-btn" id="themeToggle" title="Toggle Dark/Light Mode">
+            <i class="fas fa-moon" id="themeIcon"></i>
+        </button>
+    </div>
+
     <header>
         <h1>Turbine Analytics Suite</h1>
-        <p class="subtitle">High-fidelity visualization for turbine cycle performance data</p>
+        <p class="subtitle">Interactive Performance Visualization</p>
     </header>
 
-    <!-- INPUT SECTION: Upload & Paste -->
+    <!-- INPUT SECTION -->
     <div class="input-section">
-        <!-- 1. Drag & Drop Zone -->
         <div class="upload-area" id="dropZone">
             <input type="file" id="csvInput" accept=".csv">
             <i class="fas fa-cloud-upload-alt upload-icon"></i>
             <div class="upload-text">Upload CSV File</div>
-            <div class="upload-subtext">Drag & drop or click to browse</div>
+            <div class="upload-subtext">Drag & drop or click</div>
         </div>
-
-        <!-- 2. Paste Zone -->
         <div class="paste-area">
             <textarea id="pasteInput" placeholder="Paste Excel/CSV data here..."></textarea>
             <button class="paste-btn" id="processPasteBtn">
-                <i class="fas fa-bolt"></i> Visualize Pasted Data
+                <i class="fas fa-bolt"></i> Visualize Data
             </button>
         </div>
     </div>
 
-    <!-- File Info Indicator -->
     <div class="file-info" id="fileInfo">
-        <span class="info-tag">
-            <i class="fas fa-check-circle"></i>
-            <span id="fileName">Ready</span>
-        </span>
+        <span class="info-tag"><i class="fas fa-check-circle"></i> <span id="fileName">Ready</span></span>
     </div>
     
-    <div class="chart-wrapper">
-        <div class="chart-controls">
-            <button id="resetZoomBtn" class="control-btn">
-                <i class="fas fa-compress"></i> Reset View
-            </button>
-            <button id="openLegendBtn" class="control-btn">
-                <i class="fas fa-layer-group"></i> Layers / Legend
-            </button>
+    <!-- CHART + SIDEBAR CONTAINER -->
+    <div class="analytics-wrapper">
+        <div class="chart-wrapper">
+            <div class="chart-controls">
+                <button id="resetZoomBtn" class="control-btn"><i class="fas fa-compress"></i> Reset</button>
+                <button id="openLegendBtn" class="control-btn"><i class="fas fa-layer-group"></i> Legend</button>
+            </div>
+            
+            <div class="loader" id="loader"></div>
+            <div id="mainChart"></div>
+            <!-- Modified Simple Tooltip -->
+            <div id="customTooltip"></div>
         </div>
-        <div class="loader" id="loader"></div>
-        <div id="mainChart"></div>
-        <!-- Custom Tooltip Container -->
-        <div id="customTooltip"></div>
+
+        <!-- NEW: DATA INSPECTOR SIDEBAR -->
+        <div id="dataInspector" class="data-inspector">
+            <div class="inspector-header">
+                <div>
+                    <h3>Data Snapshot</h3>
+                    <span id="inspectorTime" class="inspector-time">Select a point...</span>
+                </div>
+                <div class="close-inspector" id="closeInspector"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="inspector-body" id="inspectorContent">
+                <!-- Rows injected here -->
+                <div style="padding:20px; text-align:center; color:var(--text-muted);">
+                    Click on the chart to view full dataset details for that timestamp.
+                </div>
+            </div>
+        </div>
     </div>
+
 </div>
 
-<!-- LEGEND MODAL -->
+<!-- LEGEND MODAL (Fixed Overflow & Header Size) -->
 <div id="legendModal" class="modal">
     <div class="modal-content">
+        <!-- Compact Header -->
         <div class="modal-header">
             <h2>Chart Layers</h2>
-            <span class="close-modal">&times;</span>
+            <span class="close-modal"><i class="fas fa-times"></i></span>
         </div>
-        <!-- Legend Controls -->
+        <!-- Compact Controls -->
         <div class="legend-controls">
             <div class="search-box">
-                <i class="fas fa-search"></i>
+                <i class="fas fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size: 0.8rem;"></i>
                 <input type="text" id="legendSearch" placeholder="Search sensors...">
             </div>
-            <div class="button-group">
-                <button id="selectAllBtn" class="action-btn">Select All</button>
-                <button id="deselectAllBtn" class="action-btn">Deselect All</button>
+            <div class="legend-actions">
+                <button id="selectAllBtn" class="control-btn">All</button>
+                <button id="deselectAllBtn" class="control-btn">None</button>
             </div>
         </div>
+        <!-- Scrollable Body -->
         <div class="modal-body">
-            <div id="customLegend" class="legend-grid">
-                <!-- Legend items injected here -->
-            </div>
+            <div id="customLegend" class="legend-grid"></div>
         </div>
     </div>
 </div>
 
 <script>
-    // 1. INITIALIZE EMPTY
-    // The chart will initialize empty.
+    // --- THEME TOGGLE LOGIC ---
+    const body = document.body;
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    let currentTheme = 'dark';
 
-    // 2. PARSE LOGIC (Robust & Deduplicated)
+    themeToggle.addEventListener('click', () => {
+        if (currentTheme === 'dark') {
+            body.setAttribute('data-theme', 'light');
+            themeIcon.classList.replace('fa-moon', 'fa-sun');
+            currentTheme = 'light';
+        } else {
+            body.setAttribute('data-theme', 'dark');
+            themeIcon.classList.replace('fa-sun', 'fa-moon');
+            currentTheme = 'dark';
+        }
+        // Force chart redraw to adapt colors if needed (mostly grid lines)
+        const chartDiv = document.getElementById('mainChart');
+        if(chartDiv.data) {
+            Plotly.relayout(chartDiv, {
+                'xaxis.gridcolor': currentTheme === 'dark' ? '#334155' : '#cbd5e1',
+                'yaxis.gridcolor': currentTheme === 'dark' ? '#334155' : '#cbd5e1',
+                'yaxis2.gridcolor': 'transparent' // keep secondary clean
+            });
+        }
+    });
+
+    // --- PARSE LOGIC (Preserved) ---
     function parseCSV(data) {
         const lines = data.split('\n').filter(line => line.trim() !== "");
         let unitRowIndex = -1;
         let nameRowIndex = -1;
         
-        // Scan for headers with Robust matching
-        // Also handle tab-separated values (Excel paste) by normalizing to comma
-        // We'll do a rough heuristic: if line has tabs, it's TSV.
         const isTSV = lines[0].indexOf('\t') > -1;
         const splitter = isTSV ? '\t' : ',';
 
         for (let i = 0; i < Math.min(lines.length, 15); i++) {
             const row = lines[i].split(splitter);
             const firstCell = row[0].replace(/["']/g, '').trim().toLowerCase();
-            
             if (firstCell === 'unit') unitRowIndex = i;
             if (firstCell === 'name' || firstCell === 'timestamp' || firstCell === 'tag') {
-                if (firstCell === 'name') {
-                    nameRowIndex = i;
-                } else if (nameRowIndex === -1) {
-                    nameRowIndex = i;
-                }
+                if (firstCell === 'name') nameRowIndex = i;
+                else if (nameRowIndex === -1) nameRowIndex = i;
             }
         }
         if (nameRowIndex === -1) nameRowIndex = 0;
 
-        // Extract headers
         const names = lines[nameRowIndex].trim().split(splitter).map(h => h.replace(/"/g, '').trim());
         let units = [];
-        if (unitRowIndex !== -1) {
-            units = lines[unitRowIndex].trim().split(splitter).map(u => u.replace(/"/g, '').trim());
-        }
+        if (unitRowIndex !== -1) units = lines[unitRowIndex].trim().split(splitter).map(u => u.replace(/"/g, '').trim());
 
-        // --- UNIQUE HEADER GENERATION ---
         const headerCounts = {}; 
         const headers = names.map((name, i) => {
             let label = name;
-            if (units[i] && units[i].toLowerCase() !== 'unit') {
-                label = `${name} (${units[i]})`;
-            }
-            
-            if (headerCounts[label]) {
-                headerCounts[label]++;
-                return `${label} (${headerCounts[label]})`;
-            } else {
-                headerCounts[label] = 1;
-                return label;
-            }
+            if (units[i] && units[i].toLowerCase() !== 'unit') label = `${name} (${units[i]})`;
+            if (headerCounts[label]) { headerCounts[label]++; return `${label} (${headerCounts[label]})`; } 
+            else { headerCounts[label] = 1; return label; }
         });
 
         const dataRows = lines.slice(nameRowIndex + 1);
         const result = { time: [], datasets: {} };
-
-        for (let i = 1; i < headers.length; i++) {
-            if(headers[i]) result.datasets[headers[i]] = [];
-        }
+        for (let i = 1; i < headers.length; i++) if(headers[i]) result.datasets[headers[i]] = [];
 
         let lastBaseTimeStr = "";
         let secondOffset = 0;
@@ -762,45 +795,26 @@
         dataRows.forEach((rowStr) => {
             const cols = rowStr.split(splitter);
             if (cols.length < 2) return; 
-
             const baseTimeStr = cols[0].replace(/"/g, '').trim();
             if (!baseTimeStr) return;
 
-            if (baseTimeStr === lastBaseTimeStr) {
-                secondOffset += 10;
-            } else {
-                secondOffset = 0;
-                lastBaseTimeStr = baseTimeStr;
-            }
+            if (baseTimeStr === lastBaseTimeStr) secondOffset += 10;
+            else { secondOffset = 0; lastBaseTimeStr = baseTimeStr; }
 
             try {
-                // Flexible Date Parsing
-                // Try native date first
                 let dateObj = new Date(baseTimeStr);
-                
-                // If native fails or we want specific logic for the "MM-DD-YY HH:mm" format from CSV
                 if (isNaN(dateObj.getTime())) {
-                    // Manual fallback
                     const parts = baseTimeStr.split(' ');
                     const dateSection = parts[0];
                     const timeSection = parts[1];
                     const dateParts = dateSection.includes('/') ? dateSection.split('/') : dateSection.split('-');
                     const timeParts = timeSection.split(':');
-
                     let year = parseInt(dateParts[2]);
                     if (year < 100) year += 2000;
-                    const month = parseInt(dateParts[0]) - 1; 
-                    const day = parseInt(dateParts[1]);
-                    const hour = parseInt(timeParts[0]);
-                    const minute = parseInt(timeParts[1]);
-
-                    let timeMs = Date.UTC(year, month, day, hour, minute, 0);
+                    let timeMs = Date.UTC(year, parseInt(dateParts[0]) - 1, parseInt(dateParts[1]), parseInt(timeParts[0]), parseInt(timeParts[1]), 0);
                     dateObj = new Date(timeMs);
                 }
-
-                // Add offset
                 dateObj.setSeconds(dateObj.getSeconds() + secondOffset);
-                
                 result.time.push(dateObj.toISOString().replace('T', ' ').slice(0, 19));
             } catch (e) { return; }
 
@@ -814,7 +828,7 @@
         return result;
     }
 
-    // 3. CHART RENDER
+    // --- CHART RENDER ---
     function drawChart(parsedData) {
         const traces = [];
         const colors = ['#00e676', '#4fc3f7', '#ff8a65', '#ba68c8', '#ffb74d', '#e57373', '#a1887f', '#90a4ae'];
@@ -826,15 +840,8 @@
                 if (name.toLowerCase().includes('sequenceid')) continue;
                 if (!values.some(v => v !== null)) continue;
 
-                // Axis Logic (Strict Unit Priority)
                 let yAxisID = 'y1'; 
-                if (name.match(/degC|°C|degF|deg F/i)) {
-                    yAxisID = 'y2'; 
-                } else if (name.match(/%|MW|bar|rpm|Pos/i)) {
-                    yAxisID = 'y1'; 
-                } else if (name.match(/Temp|BPT|EXT/i)) {
-                    yAxisID = 'y2'; 
-                }
+                if (name.match(/degC|°C|degF|deg F|Temp|BPT|EXT/i)) yAxisID = 'y2'; 
                 
                 const traceColor = colors[colorIdx % colors.length];
 
@@ -844,24 +851,12 @@
                     mode: 'lines',
                     name: name,
                     yaxis: yAxisID,
-                    line: {
-                        color: traceColor,
-                        width: 2.5,
-                        shape: 'spline', 
-                        smoothing: 0.8,
-                        dash: 'solid' 
-                    },
+                    line: { color: traceColor, width: 2.5, shape: 'spline', smoothing: 0.8 },
                     type: 'scatter',
                     connectgaps: true 
                 });
 
-                legendItemsData.push({
-                    name: name,
-                    color: traceColor,
-                    style: 'solid', 
-                    index: traces.length - 1
-                });
-
+                legendItemsData.push({ name: name, color: traceColor, index: traces.length - 1 });
                 colorIdx++;
             }
         }
@@ -870,25 +865,20 @@
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(0,0,0,0)',
             font: { family: 'Inter, sans-serif', color: '#94a3b8', size: 12 },
-            
-            // CONFIG FOR CUSTOM HOVER
             hovermode: 'closest', 
-            hoverdistance: 50,    
+            hoverdistance: 30,    
             showlegend: false,    
-            
             margin: { t: 80, b: 50, l: 60, r: 60 }, 
             xaxis: {
-                gridcolor: '#334155',
-                // MINIMAL SPIKE LINE
-                showspikes: false, // Completely removed per request
-                rangeslider: { visible: false }, 
-                zeroline: false
+                gridcolor: currentTheme === 'dark' ? '#334155' : '#cbd5e1',
+                showspikes: false, 
+                rangeslider: { visible: false }
             },
             yaxis: {
-                title: 'Main Units (MW, %, etc)',
-                gridcolor: '#334155',
-                zerolinecolor: '#334155',
-                showspikes: false, // Removed
+                title: 'Main Units',
+                gridcolor: currentTheme === 'dark' ? '#334155' : '#cbd5e1',
+                zerolinecolor: currentTheme === 'dark' ? '#334155' : '#cbd5e1',
+                showspikes: false,
             },
             yaxis2: {
                 title: 'Temperature (°C)',
@@ -896,375 +886,231 @@
                 side: 'right',
                 gridcolor: 'transparent',
                 zeroline: false,
-                showspikes: false, // Removed
+                showspikes: false,
             }
         };
 
-        const config = { 
-            responsive: true, 
-            displayModeBar: false,
-            displaylogo: false 
-        };
-
+        const config = { responsive: true, displayModeBar: false };
         const chartDiv = document.getElementById('mainChart');
-        chartDiv.style.opacity = 0;
         
         Plotly.newPlot('mainChart', traces, layout, config).then(() => {
-            const animation = chartDiv.animate([
-                { opacity: 0 },
-                { opacity: 1 }
-            ], { duration: 500, fill: 'forwards' });
-
             buildCustomLegend(legendItemsData, chartDiv);
-            setupCustomHover(chartDiv, parsedData, traces);
+            setupCustomHover(chartDiv, parsedData);
+            setupClickInteraction(chartDiv, parsedData, traces);
         });
         
-        // Reset Zoom Handler
         document.getElementById('resetZoomBtn').onclick = function() {
-            Plotly.relayout(chartDiv, {
-                'xaxis.autorange': true,
-                'yaxis.autorange': true,
-                'yaxis2.autorange': true
-            });
+            Plotly.relayout(chartDiv, { 'xaxis.autorange': true, 'yaxis.autorange': true, 'yaxis2.autorange': true });
         };
     }
 
-    // --- CUSTOM HOVER LOGIC ---
-    let hoverTimer;
+    // --- 1. NEW: SIMPLIFIED HOVER (One value only) ---
     const tooltip = document.getElementById('customTooltip');
+    let hoverTimer;
 
-    function setupCustomHover(chartDiv, parsedData, traces) {
-        
-        Plotly.relayout(chartDiv, {
-            'hoverlabel.bgcolor': 'rgba(0,0,0,0)',
-            'hoverlabel.bordercolor': 'rgba(0,0,0,0)',
-            'hoverlabel.font.color': 'rgba(0,0,0,0)'
-        });
+    function setupCustomHover(chartDiv, parsedData) {
+        Plotly.relayout(chartDiv, { 'hoverlabel.bgcolor': 'rgba(0,0,0,0)', 'hoverlabel.bordercolor': 'rgba(0,0,0,0)', 'hoverlabel.font.color': 'rgba(0,0,0,0)' });
 
         chartDiv.on('plotly_hover', function(data) {
             clearTimeout(hoverTimer);
             hoverTimer = setTimeout(() => {
                 const pt = data.points[0];
-                const pointIndex = pt.pointIndex; 
-                const timeStr = parsedData.time[pointIndex];
-                const hoveredCurveNumber = pt.curveNumber;
-
-                let html = `<div class="tooltip-header">${timeStr}</div>`;
-
-                // Highlighted Item
-                const hoveredName = pt.data.name;
-                const hoveredColor = pt.data.line.color;
-                const hoveredVal = pt.y; 
-
-                html += `
-                <div class="tooltip-row highlight" style="--row-color:${hoveredColor}">
-                    <div class="tooltip-label">
-                        ${hoveredName}
-                    </div>
-                    <div class="tooltip-value">${formatVal(hoveredVal)}</div>
-                </div>`;
-
-                // All other visible traces
-                const currentData = chartDiv.data; 
+                const timeStr = parsedData.time[pt.pointIndex];
+                const color = pt.data.line.color;
                 
-                currentData.forEach((trace, idx) => {
-                    if (idx === hoveredCurveNumber) return;
-                    if (trace.visible === 'legendonly') return;
-                    
-                    const val = trace.y[pointIndex];
-                    if (val !== null && val !== undefined) {
-                         html += `
-                        <div class="tooltip-row" style="--row-color:${trace.line.color}">
-                            <div class="tooltip-label">
-                                ${trace.name}
-                            </div>
-                            <div class="tooltip-value">${formatVal(val)}</div>
-                        </div>`;
-                    }
-                });
+                // Only show THE ONE hovered value
+                const html = `
+                    <div class="tooltip-header-simple">${timeStr}</div>
+                    <div class="tooltip-label-simple" style="color:${color}">
+                        <span style="display:inline-block;width:10px;height:10px;background:${color};border-radius:50%;"></span>
+                        ${pt.data.name}
+                    </div>
+                    <div class="tooltip-value-simple">${formatVal(pt.y)}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:5px;">Click to view full data</div>
+                `;
 
                 tooltip.innerHTML = html;
                 tooltip.classList.add('visible');
-            }, 200);
+            }, 50);
         });
 
         chartDiv.addEventListener('mousemove', (e) => {
             const wrapper = document.querySelector('.chart-wrapper');
             const rect = wrapper.getBoundingClientRect();
-            
             let x = e.clientX - rect.left + 15;
             let y = e.clientY - rect.top + 15;
             
+            // Boundary checks
+            if (x + 160 > rect.width) x -= 180;
+            if (y + 100 > rect.height) y -= 120;
+
             tooltip.style.left = x + 'px';
             tooltip.style.top = y + 'px';
         });
 
-        chartDiv.on('plotly_unhover', function(data) {
+        chartDiv.on('plotly_unhover', function() {
             clearTimeout(hoverTimer);
             tooltip.classList.remove('visible');
         });
     }
-    
-    function formatVal(v) {
-        if (typeof v === 'number') return v.toFixed(2);
-        return v;
+
+    // --- 2. NEW: CLICK TO SHOW SIDEBAR (All Data) ---
+    const inspector = document.getElementById('dataInspector');
+    const inspectorContent = document.getElementById('inspectorContent');
+    const inspectorTime = document.getElementById('inspectorTime');
+    const closeInspectorBtn = document.getElementById('closeInspector');
+
+    closeInspectorBtn.onclick = () => {
+        inspector.classList.remove('active');
+    };
+
+    function setupClickInteraction(chartDiv, parsedData, traces) {
+        chartDiv.on('plotly_click', function(data) {
+            const pt = data.points[0];
+            const idx = pt.pointIndex;
+            const timeStr = parsedData.time[idx];
+
+            // Update Header
+            inspectorTime.textContent = timeStr;
+            inspectorContent.innerHTML = ''; // Clear previous
+
+            // Build List
+            // Filter only visible traces
+            const visibleTraces = traces.filter((t, i) => {
+                const meta = chartDiv._fullData[i]; 
+                return meta.visible !== 'legendonly';
+            });
+
+            visibleTraces.forEach(trace => {
+                const val = trace.y[idx];
+                if (val !== null && val !== undefined) {
+                    const row = document.createElement('div');
+                    row.className = 'inspector-row';
+                    row.style.setProperty('--row-color', trace.line.color);
+                    row.innerHTML = `
+                        <div style="display:flex; align-items:center;">
+                            <span class="inspector-label">${trace.name}</span>
+                        </div>
+                        <span class="inspector-value">${formatVal(val)}</span>
+                    `;
+                    inspectorContent.appendChild(row);
+                }
+            });
+
+            inspector.classList.add('active');
+        });
     }
 
+    function formatVal(v) { return typeof v === 'number' ? v.toFixed(2) : v; }
 
-    // --- CUSTOM LEGEND LOGIC ---
+    // --- LEGEND LOGIC (Refined for Theme) ---
     function buildCustomLegend(items, chartDiv) {
         const container = document.getElementById('customLegend');
         container.innerHTML = ''; 
-
-        let elements = [];
+        const elements = [];
 
         items.forEach(item => {
             const el = document.createElement('div');
             el.className = 'legend-item';
-            el.dataset.name = item.name.toLowerCase(); 
+            el.dataset.name = item.name.toLowerCase();
             
-            // Toggle Area
-            const toggleArea = document.createElement('div');
-            toggleArea.className = 'item-toggle-area';
-            
-            const dot = document.createElement('div');
-            dot.className = 'color-dot';
-            dot.style.backgroundColor = item.color;
-
-            const label = document.createElement('span');
-            label.className = 'legend-label';
-            label.textContent = item.name;
-
-            toggleArea.appendChild(dot);
-            toggleArea.appendChild(label);
-
-            // Settings
-            const settingsBtn = document.createElement('div');
-            settingsBtn.className = 'item-settings-btn';
-            settingsBtn.innerHTML = '<i class="fas fa-cog"></i>';
-
-            const popover = document.createElement('div');
-            popover.className = 'settings-popover';
-            popover.innerHTML = `
-                <div class="popover-row">
-                    <span>Color</span>
-                    <input type="color" value="${item.color}" class="color-picker">
-                </div>
-                <div class="popover-row">
-                    <span>Style</span>
-                    <select class="style-select">
-                        <option value="solid" ${item.style === 'solid' ? 'selected' : ''}>Solid</option>
-                        <option value="dash" ${item.style === 'dash' ? 'selected' : ''}>Dash</option>
-                        <option value="dot" ${item.style === 'dot' ? 'selected' : ''}>Dot</option>
-                        <option value="dashdot" ${item.style === 'dashdot' ? 'selected' : ''}>Dash-Dot</option>
-                    </select>
-                </div>
+            el.innerHTML = `
+                <div style="width:10px; height:10px; background:${item.color}; border-radius:50%; margin-right:8px; flex-shrink:0;"></div>
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.name}</span>
             `;
 
-            el.appendChild(toggleArea);
-            el.appendChild(settingsBtn);
-            el.appendChild(popover);
-
-            // Toggle Handler
-            toggleArea.addEventListener('click', (e) => {
-                if(e.target.closest('.settings-popover')) return;
-
+            el.onclick = () => {
                 const isHidden = el.classList.contains('hidden-item');
-                
                 if(isHidden) {
                     el.classList.remove('hidden-item');
-                    dot.style.backgroundColor = item.color;
+                    el.firstElementChild.style.background = item.color;
                     Plotly.restyle(chartDiv, {visible: true}, [item.index]);
                 } else {
                     el.classList.add('hidden-item');
-                    dot.style.backgroundColor = '#555';
+                    el.firstElementChild.style.background = '#777';
                     Plotly.restyle(chartDiv, {visible: 'legendonly'}, [item.index]);
                 }
-            });
-
-            // Settings Handlers
-            settingsBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.querySelectorAll('.settings-popover').forEach(p => {
-                    if(p !== popover) p.classList.remove('show');
-                });
-                popover.classList.toggle('show');
-            });
-
-            popover.querySelector('.color-picker').addEventListener('input', (e) => {
-                const newColor = e.target.value;
-                item.color = newColor;
-                dot.style.backgroundColor = newColor;
-                Plotly.restyle(chartDiv, {'line.color': newColor}, [item.index]);
-            });
-
-            popover.querySelector('.style-select').addEventListener('change', (e) => {
-                const newStyle = e.target.value;
-                item.style = newStyle;
-                Plotly.restyle(chartDiv, {'line.dash': newStyle}, [item.index]);
-            });
-
+            };
             container.appendChild(el);
             elements.push({el, item});
         });
 
-        // Global close
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.item-settings-btn') && !e.target.closest('.settings-popover')) {
-                document.querySelectorAll('.settings-popover').forEach(p => p.classList.remove('show'));
-            }
+        // Search & Bulk Logic
+        document.getElementById('legendSearch').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            elements.forEach(obj => {
+                obj.el.style.display = obj.el.dataset.name.includes(term) ? 'flex' : 'none';
+            });
         });
 
-        // Bulk Actions
         document.getElementById('selectAllBtn').onclick = () => {
             const indices = [];
             elements.forEach(obj => {
                 obj.el.classList.remove('hidden-item');
-                obj.el.querySelector('.color-dot').style.backgroundColor = obj.item.color;
-                if(obj.el.style.display !== 'none') indices.push(obj.item.index);
+                obj.el.firstElementChild.style.background = obj.item.color;
+                indices.push(obj.item.index);
             });
-            if(indices.length > 0) Plotly.restyle(chartDiv, {visible: true}, indices);
+            Plotly.restyle(chartDiv, {visible: true}, indices);
         };
-
         document.getElementById('deselectAllBtn').onclick = () => {
             const indices = [];
             elements.forEach(obj => {
-                if(obj.el.style.display !== 'none') {
-                    obj.el.classList.add('hidden-item');
-                    obj.el.querySelector('.color-dot').style.backgroundColor = '#555';
-                    indices.push(obj.item.index);
-                }
+                obj.el.classList.add('hidden-item');
+                obj.el.firstElementChild.style.background = '#777';
+                indices.push(obj.item.index);
             });
-            if(indices.length > 0) Plotly.restyle(chartDiv, {visible: 'legendonly'}, indices);
+            Plotly.restyle(chartDiv, {visible: 'legendonly'}, indices);
         };
-
-        // Search
-        const searchInput = document.getElementById('legendSearch');
-        const newSearch = searchInput.cloneNode(true);
-        searchInput.parentNode.replaceChild(newSearch, searchInput);
-        
-        newSearch.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            elements.forEach(obj => {
-                if (obj.el.dataset.name.includes(term)) {
-                    obj.el.style.display = 'flex';
-                } else {
-                    obj.el.style.display = 'none';
-                }
-            });
-        });
     }
 
-    // --- MODAL LOGIC ---
+    // --- GENERIC UI ---
     const modal = document.getElementById('legendModal');
-    const openBtn = document.getElementById('openLegendBtn');
-    const closeBtn = document.querySelector('.close-modal');
+    document.getElementById('openLegendBtn').onclick = () => { modal.classList.add('show'); document.body.style.overflow = 'hidden'; }
+    
+    const closeModal = () => { modal.classList.remove('show'); document.body.style.overflow = ''; }
+    document.querySelector('.close-modal').onclick = closeModal;
+    window.onclick = (e) => { if (e.target == modal) closeModal(); }
 
-    openBtn.onclick = function() {
-        modal.classList.add('show');
-        document.body.style.overflow = 'hidden';
-    }
-
-    closeBtn.onclick = function() {
-        modal.classList.remove('show');
-        document.body.style.overflow = '';
-    }
-
-    window.onclick = function(event) {
-        if (event.target == modal) {
-            modal.classList.remove('show');
-            document.body.style.overflow = '';
-        }
-    }
-
-    // 5. UI INTERACTIONS
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('csvInput');
-    const fileInfo = document.getElementById('fileInfo');
-    const fileNameSpan = document.getElementById('fileName');
-    const loader = document.getElementById('loader');
-    const chartDiv = document.getElementById('mainChart');
     
-    // New Paste Logic
-    const pasteInput = document.getElementById('pasteInput');
-    const processPasteBtn = document.getElementById('processPasteBtn');
-
-    // Drag & Drop Visuals
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.add('dragover');
-        }, false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            dropZone.classList.remove('dragover');
-        }, false);
-    });
-
-    // Handle File Upload
     function handleFile(file) {
         if (!file) return;
+        document.getElementById('loader').style.display = 'block';
+        document.getElementById('mainChart').style.opacity = '0.3';
         
-        fileInfo.classList.remove('visible');
-        chartDiv.style.opacity = '0.3';
-        loader.style.display = 'block';
-
-        setTimeout(() => { 
+        setTimeout(() => {
             const reader = new FileReader();
             reader.onload = function(event) {
-                const text = event.target.result;
-                const parsedData = parseCSV(text);
-                
-                fileNameSpan.textContent = `Analyzing: ${file.name}`;
-                fileInfo.classList.add('visible');
-                
-                drawChart(parsedData);
-                
-                loader.style.display = 'none';
-                chartDiv.style.opacity = '1';
+                const parsed = parseCSV(event.target.result);
+                document.getElementById('fileName').textContent = `File: ${file.name}`;
+                document.getElementById('fileInfo').classList.add('visible');
+                drawChart(parsed);
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('mainChart').style.opacity = '1';
             };
             reader.readAsText(file);
         }, 100);
     }
 
-    // Handle Paste
-    processPasteBtn.addEventListener('click', () => {
-        const text = pasteInput.value;
-        if(!text.trim()) return;
+    document.getElementById('processPasteBtn').onclick = () => {
+        const txt = document.getElementById('pasteInput').value;
+        if(!txt.trim()) return;
+        const parsed = parseCSV(txt);
+        document.getElementById('fileName').textContent = "Source: Pasted Data";
+        document.getElementById('fileInfo').classList.add('visible');
+        drawChart(parsed);
+    };
 
-        fileInfo.classList.remove('visible');
-        chartDiv.style.opacity = '0.3';
-        loader.style.display = 'block';
-
-        setTimeout(() => {
-            const parsedData = parseCSV(text);
-            
-            fileNameSpan.textContent = `Analyzing: Pasted Data`;
-            fileInfo.classList.add('visible');
-            
-            drawChart(parsedData);
-            
-            loader.style.display = 'none';
-            chartDiv.style.opacity = '1';
-        }, 100);
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+    dropZone.addEventListener('drop', (e) => { 
+        e.preventDefault(); dropZone.classList.remove('dragover'); 
+        handleFile(e.dataTransfer.files[0]); 
     });
-
     fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
-    dropZone.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFile(files[0]);
-    });
 
-    // Initial Load - Empty Chart
     drawChart({ time: [], datasets: {} });
-
 </script>
-
 </body>
 </html>
