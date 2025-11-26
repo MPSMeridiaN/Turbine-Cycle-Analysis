@@ -627,6 +627,32 @@
             font-size: 0.9rem;
         }
 
+        /* --- NEW CSS FOR LEGEND GROUPING --- */
+        .legend-category-block {
+            margin-bottom: 20px;
+        }
+
+        .legend-category-header {
+            color: var(--primary-color);
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--glass-border);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .legend-category-header i {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
     </style>
 </head>
 <body data-theme="dark">
@@ -904,7 +930,7 @@
         };
     }
 
-    // --- 1. NEW: SIMPLIFIED HOVER (One value only) ---
+    // --- 1. SIMPLIFIED HOVER (One value only) ---
     const tooltip = document.getElementById('customTooltip');
     let hoverTimer;
 
@@ -954,7 +980,7 @@
         });
     }
 
-    // --- 2. NEW: CLICK TO SHOW SIDEBAR (All Data) ---
+    // --- 2. CLICK TO SHOW SIDEBAR (All Data) ---
     const inspector = document.getElementById('dataInspector');
     const inspectorContent = document.getElementById('inspectorContent');
     const inspectorTime = document.getElementById('inspectorTime');
@@ -1003,47 +1029,122 @@
 
     function formatVal(v) { return typeof v === 'number' ? v.toFixed(2) : v; }
 
-    // --- LEGEND LOGIC (Refined for Theme) ---
+    // --- LEGEND LOGIC (NEW: Categorized & Sorted) ---
     function buildCustomLegend(items, chartDiv) {
         const container = document.getElementById('customLegend');
         container.innerHTML = ''; 
+        // Display block required for headers
+        container.style.display = 'block'; 
+
         const elements = [];
+        const groups = {};
 
+        // 1. Group and Clean Names
         items.forEach(item => {
-            const el = document.createElement('div');
-            el.className = 'legend-item';
-            el.dataset.name = item.name.toLowerCase();
+            // Regex separate name and unit: "Main Steam (bar)" -> name="Main Steam", unit="bar"
+            const match = item.name.match(/^(.*?)\s*\(([^)]+)\)$/);
             
-            el.innerHTML = `
-                <div style="width:10px; height:10px; background:${item.color}; border-radius:50%; margin-right:8px; flex-shrink:0;"></div>
-                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.name}</span>
-            `;
+            let cleanName = item.name;
+            let category = "General / No Unit";
 
-            el.onclick = () => {
-                const isHidden = el.classList.contains('hidden-item');
-                if(isHidden) {
-                    el.classList.remove('hidden-item');
-                    el.firstElementChild.style.background = item.color;
-                    Plotly.restyle(chartDiv, {visible: true}, [item.index]);
-                } else {
-                    el.classList.add('hidden-item');
-                    el.firstElementChild.style.background = '#777';
-                    Plotly.restyle(chartDiv, {visible: 'legendonly'}, [item.index]);
-                }
-            };
-            container.appendChild(el);
-            elements.push({el, item});
-        });
+            if (match) {
+                cleanName = match[1].trim(); // Name without unit
+                category = match[2].trim();  // Unit in parentheses
+            }
 
-        // Search & Bulk Logic
-        document.getElementById('legendSearch').addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            elements.forEach(obj => {
-                obj.el.style.display = obj.el.dataset.name.includes(term) ? 'flex' : 'none';
+            if (!groups[category]) {
+                groups[category] = [];
+            }
+            groups[category].push({
+                ...item,
+                cleanName: cleanName
             });
         });
 
-        document.getElementById('selectAllBtn').onclick = () => {
+        // 2. Sort Categories Alphabetically
+        const sortedCategories = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+
+        // 3. Create DOM elements
+        sortedCategories.forEach(category => {
+            const groupItems = groups[category];
+            
+            // Sort items within category
+            groupItems.sort((a, b) => a.cleanName.localeCompare(b.cleanName));
+
+            // Wrapper
+            const groupBlock = document.createElement('div');
+            groupBlock.className = 'legend-category-block';
+            
+            // Header
+            const header = document.createElement('div');
+            header.className = 'legend-category-header';
+            header.innerHTML = `<i class="fas fa-tag"></i> ${category}`;
+            groupBlock.appendChild(header);
+
+            // Grid for items
+            const grid = document.createElement('div');
+            grid.className = 'legend-grid'; 
+            grid.style.padding = '0'; // Override generic grid padding
+            
+            groupItems.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'legend-item';
+                el.dataset.name = item.cleanName.toLowerCase();
+                
+                el.innerHTML = `
+                    <div style="width:10px; height:10px; background:${item.color}; border-radius:50%; margin-right:8px; flex-shrink:0;"></div>
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.cleanName}</span>
+                `;
+
+                el.onclick = () => {
+                    const isHidden = el.classList.contains('hidden-item');
+                    if(isHidden) {
+                        el.classList.remove('hidden-item');
+                        el.firstElementChild.style.background = item.color;
+                        Plotly.restyle(chartDiv, {visible: true}, [item.index]);
+                    } else {
+                        el.classList.add('hidden-item');
+                        el.firstElementChild.style.background = '#777';
+                        Plotly.restyle(chartDiv, {visible: 'legendonly'}, [item.index]);
+                    }
+                };
+                grid.appendChild(el);
+                elements.push({el, item});
+            });
+
+            groupBlock.appendChild(grid);
+            container.appendChild(groupBlock);
+        });
+
+        // 4. Update Search Function
+        const searchInput = document.getElementById('legendSearch');
+        
+        // Re-create node to remove old event listeners (simplest way to prevent duplicates)
+        const newSearchInput = searchInput.cloneNode(true);
+        searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+
+        newSearchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            
+            elements.forEach(obj => {
+                const itemName = obj.el.dataset.name; 
+                obj.el.style.display = itemName.includes(term) ? 'flex' : 'none';
+            });
+
+            // Hide categories if empty
+            document.querySelectorAll('.legend-category-block').forEach(block => {
+                // Check visible children
+                const visibleItems = Array.from(block.querySelectorAll('.legend-item')).filter(el => el.style.display !== 'none');
+                block.style.display = visibleItems.length > 0 ? 'block' : 'none';
+            });
+        });
+
+        // 5. Update Bulk Actions
+        const oldSelectBtn = document.getElementById('selectAllBtn');
+        const newSelectBtn = oldSelectBtn.cloneNode(true);
+        oldSelectBtn.parentNode.replaceChild(newSelectBtn, oldSelectBtn);
+
+        newSelectBtn.onclick = () => {
             const indices = [];
             elements.forEach(obj => {
                 obj.el.classList.remove('hidden-item');
@@ -1052,7 +1153,12 @@
             });
             Plotly.restyle(chartDiv, {visible: true}, indices);
         };
-        document.getElementById('deselectAllBtn').onclick = () => {
+
+        const oldDeselectBtn = document.getElementById('deselectAllBtn');
+        const newDeselectBtn = oldDeselectBtn.cloneNode(true);
+        oldDeselectBtn.parentNode.replaceChild(newDeselectBtn, oldDeselectBtn);
+
+        newDeselectBtn.onclick = () => {
             const indices = [];
             elements.forEach(obj => {
                 obj.el.classList.add('hidden-item');
