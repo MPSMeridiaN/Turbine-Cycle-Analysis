@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbine Analytics Suite v2.5</title>
+    <title>Turbine Analytics Suite v2.9</title>
     <!-- Load Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <!-- Font Awesome for Icons -->
@@ -920,48 +920,159 @@
         }
     });
 
-    // --- PARSE LOGIC ---
+    // --- HELPER: FORMAT DATE TO LOCAL STRING (Preserves Face Value) ---
+    function formatDateToLocalString(date) {
+        const pad = (num) => (num < 10 ? '0' : '') + num;
+        return date.getFullYear() +
+            '-' + pad(date.getMonth() + 1) +
+            '-' + pad(date.getDate()) +
+            ' ' + pad(date.getHours()) +
+            ':' + pad(date.getMinutes()) +
+            ':' + pad(date.getSeconds());
+    }
+
+    // --- HELPER: ROBUST DATE PARSER (Handles DD/MM/YYYY vs YYYY/MM/DD) ---
+    function parseDateSmart(str) {
+        if(!str) return null;
+        const cleanStr = str.replace(/"/g, '').trim();
+        
+        // Split Date and Time
+        const parts = cleanStr.split(/[\sT]+/);
+        const datePart = parts[0];
+        const timePart = parts[1] || "00:00:00";
+        
+        // Manual Parsing for DD-MM-YY or DD/MM/YY (common in Thailand/Excel)
+        // Checks for either '/' or '-' separator
+        if (datePart.includes('/') || datePart.includes('-')) {
+            const separator = datePart.includes('/') ? '/' : '-';
+            const dComps = datePart.split(separator).map(Number);
+            const tComps = timePart.split(':').map(Number);
+
+            // Case 1: YYYY-MM-DD (Year at start)
+            // If the first number is > 31, it MUST be a year.
+            if (dComps[0] > 31) {
+                 // dComps[0] = Year, dComps[1] = Month, dComps[2] = Day
+                 return new Date(dComps[0], dComps[1] - 1, dComps[2], tComps[0]||0, tComps[1]||0, tComps[2]||0);
+            }
+            
+            // Case 2: DD-MM-YYYY or DD-MM-YY (Day at start)
+            // Condition: Year at end is explicit (e.g. 2025) OR Day > 12 (ambiguity resolver vs MM-DD-YYYY)
+            // Or simply fallback to this if Case 1 didn't match and it has 3 parts
+            if (dComps.length === 3) {
+                 let year = dComps[2];
+                 if(year < 100) year += 2000; // Handle YY -> 20YY
+                 
+                 // dComps[0] = Day, dComps[1] = Month, dComps[2] = Year
+                 return new Date(year, dComps[1] - 1, dComps[0], tComps[0]||0, tComps[1]||0, tComps[2]||0);
+            }
+        }
+        
+        // Fallback to Native Parser
+        const normalized = cleanStr.replace(/-/g, '/');
+        const d = new Date(normalized);
+        if (!isNaN(d.getTime())) {
+            return d;
+        }
+        
+        return null;
+    }
+
+    // --- PARSE LOGIC (UPDATED FOR EXCEL COPY-PASTE) ---
     function parseCSV(data) {
         const lines = data.split('\n').filter(line => line.trim() !== "");
+        if (lines.length === 0) return { time: [], datasets: {} };
+
+        // --- Improved Delimiter Detection (Score-based) ---
+        let tabCount = 0;
+        let commaCount = 0;
+        let semiCount = 0;
+        const limit = Math.min(lines.length, 5);
+        for(let i=0; i<limit; i++) {
+            const line = lines[i];
+            tabCount += (line.match(/\t/g) || []).length;
+            commaCount += (line.match(/,/g) || []).length;
+            semiCount += (line.match(/;/g) || []).length;
+        }
+        // Prioritize Tab (Excel) -> Comma (CSV) -> Semicolon
+        let splitter = ',';
+        if (tabCount >= commaCount && tabCount >= semiCount && tabCount > 0) splitter = '\t';
+        else if (semiCount > commaCount && semiCount > tabCount) splitter = ';';
+
+        // --- Metadata & Header Detection ---
         let unitRowIndex = -1;
         let nameRowIndex = -1;
         
-        const isTSV = lines[0].indexOf('\t') > -1;
-        const splitter = isTSV ? '\t' : ',';
-
+        // Look for specific keywords to identify rows
         for (let i = 0; i < Math.min(lines.length, 15); i++) {
             const row = lines[i].split(splitter);
             const firstCell = row[0].replace(/["']/g, '').trim().toLowerCase();
             if (firstCell === 'unit') unitRowIndex = i;
-            if (firstCell === 'name' || firstCell === 'timestamp' || firstCell === 'tag') {
-                if (firstCell === 'name') nameRowIndex = i;
-                else if (nameRowIndex === -1) nameRowIndex = i;
+            // Priority: Name > Tag. If 'name' is found, lock it.
+            if (firstCell === 'name') {
+                nameRowIndex = i;
+            } else if (firstCell === 'tag' && nameRowIndex === -1) {
+                nameRowIndex = i; 
+            } else if ((firstCell === 'timestamp' || firstCell === 'date' || firstCell === 'time') && nameRowIndex === -1) {
+                nameRowIndex = i;
             }
         }
-        if (nameRowIndex === -1) nameRowIndex = 0;
-
-        const names = lines[nameRowIndex].trim().split(splitter).map(h => h.replace(/"/g, '').trim());
+        
+        // --- Fallback: Headerless Data Detection ---
+        let headers = [];
         let units = [];
-        if (unitRowIndex !== -1) units = lines[unitRowIndex].trim().split(splitter).map(u => u.replace(/"/g, '').trim());
+        let dataStartIndex = 0;
 
-        const headerCounts = {}; 
-        const headers = names.map((name, i) => {
-            let label = name;
-            if (units[i] && units[i].toLowerCase() !== 'unit') label = `${name} (${units[i]})`;
-            if (headerCounts[label]) { headerCounts[label]++; return `${label} (${headerCounts[label]})`; } 
-            else { headerCounts[label] = 1; return label; }
-        });
+        if (nameRowIndex === -1) {
+            // Check if first cell of first row is a valid date
+            const firstRow = lines[0].split(splitter);
+            const testDate = parseDateSmart(firstRow[0]);
+            
+            if (testDate && !isNaN(testDate.getTime())) {
+                // It is data! Generate generic headers
+                nameRowIndex = -1; // Flag as no header
+                dataStartIndex = 0;
+                headers = ["Timestamp"];
+                for(let j=1; j<firstRow.length; j++) {
+                    headers.push(`Column ${j}`);
+                }
+            } else {
+                // Assume row 0 is header even if not recognized
+                nameRowIndex = 0;
+                dataStartIndex = 1;
+            }
+        } else {
+            dataStartIndex = nameRowIndex + 1;
+        }
 
-        const dataRows = lines.slice(nameRowIndex + 1);
+        // --- Build Headers ---
+        if (nameRowIndex !== -1) {
+            const names = lines[nameRowIndex].trim().split(splitter).map(h => h.replace(/"/g, '').trim());
+            if (unitRowIndex !== -1) units = lines[unitRowIndex].trim().split(splitter).map(u => u.replace(/"/g, '').trim());
+
+            const headerCounts = {}; 
+            headers = names.map((name, i) => {
+                let label = name || `Col ${i}`;
+                if (units[i] && units[i].toLowerCase() !== 'unit') label = `${label} (${units[i]})`;
+                if (headerCounts[label]) { headerCounts[label]++; return `${label} (${headerCounts[label]})`; } 
+                else { headerCounts[label] = 1; return label; }
+            });
+        }
+
+        // --- Parse Data ---
         const result = { time: [], datasets: {} };
+        // Initialize dataset arrays (skip index 0 which is Time)
         for (let i = 1; i < headers.length; i++) if(headers[i]) result.datasets[headers[i]] = [];
 
+        const dataRows = lines.slice(dataStartIndex);
         let lastBaseTimeStr = "";
         let secondOffset = 0;
+        let validRows = 0;
 
         dataRows.forEach((rowStr) => {
             const cols = rowStr.split(splitter);
-            if (cols.length < 2) return; 
+            // Relaxed check: Accept if at least 1 column exists (Timestamp)
+            if (cols.length < 1) return; 
+            
             const baseTimeStr = cols[0].replace(/"/g, '').trim();
             if (!baseTimeStr) return;
 
@@ -969,20 +1080,15 @@
             else { secondOffset = 0; lastBaseTimeStr = baseTimeStr; }
 
             try {
-                let dateObj = new Date(baseTimeStr);
-                if (isNaN(dateObj.getTime())) {
-                    const parts = baseTimeStr.split(' ');
-                    const dateSection = parts[0];
-                    const timeSection = parts[1];
-                    const dateParts = dateSection.includes('/') ? dateSection.split('/') : dateSection.split('-');
-                    const timeParts = timeSection.split(':');
-                    let year = parseInt(dateParts[2]);
-                    if (year < 100) year += 2000;
-                    let timeMs = Date.UTC(year, parseInt(dateParts[0]) - 1, parseInt(dateParts[1]), parseInt(timeParts[0]), parseInt(timeParts[1]), 0);
-                    dateObj = new Date(timeMs);
+                let dateObj = parseDateSmart(baseTimeStr);
+                
+                if (dateObj) {
+                    dateObj.setSeconds(dateObj.getSeconds() + secondOffset);
+                    result.time.push(formatDateToLocalString(dateObj));
+                    validRows++;
+                } else {
+                    return; 
                 }
-                dateObj.setSeconds(dateObj.getSeconds() + secondOffset);
-                result.time.push(dateObj.toISOString().replace('T', ' ').slice(0, 19));
             } catch (e) { return; }
 
             for (let i = 1; i < headers.length; i++) {
@@ -992,11 +1098,22 @@
                 result.datasets[headerName].push(isNaN(val) ? null : val);
             }
         });
+        
+        console.log(`Parsed ${validRows} rows. Splitter: '${splitter === '\t' ? 'TAB' : splitter}'. Headers: ${headers.join(', ')}`);
         return result;
     }
 
     // --- CHART RENDER ---
     function drawChart(parsedData) {
+        if (!parsedData || parsedData.time.length === 0) {
+            // Optional: Show error if paste resulted in empty data
+            // But verify it wasn't just an empty initial call
+            if(parsedData && document.getElementById('pasteInput').value.trim().length > 0) {
+                 alert("Could not parse data. Please check if your Excel data includes a Timestamp column.");
+            }
+            return;
+        }
+
         const traces = [];
         const colors = ['#00e676', '#4fc3f7', '#ff8a65', '#ba68c8', '#ffb74d', '#e57373', '#a1887f', '#90a4ae'];
         let colorIdx = 0;
