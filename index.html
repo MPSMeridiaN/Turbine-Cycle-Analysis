@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbine Analytics Suite v2.4</title>
+    <title>Turbine Analytics Suite v2.5</title>
     <!-- Load Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <!-- Font Awesome for Icons -->
@@ -297,41 +297,52 @@
             border-radius: 8px;
         }
 
-        /* --- DATA INSPECTOR SIDEBAR --- */
+        /* --- NEW: FLOATING DATA INSPECTOR (UPDATED) --- */
         .data-inspector {
-            width: 0;
+            width: 320px;
+            /* Remove sidebar-specific styles */
+            /* bottom: 0; */
+            max-height: 80vh; /* Don't be too tall */
             overflow: hidden;
+            
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
-            border-left: 1px solid var(--glass-border);
-            border-radius: 16px;
+            
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            
+            /* Positioning as floating element */
             position: absolute;
-            right: 0;
-            top: 0;
-            bottom: 0;
+            top: 70px; /* Initial Top */
+            right: 30px; /* Initial Right */
             z-index: 60;
-            box-shadow: -10px 0 30px var(--shadow-color);
-            transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-            opacity: 0;
-            display: flex;
+            
+            box-shadow: 0 15px 40px var(--shadow-color);
+            
+            display: none; /* Hidden by default */
             flex-direction: column;
-            transform: translateX(20px);
+            
+            /* Fade animation only, no slide */
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
         .data-inspector.active {
-            width: 320px;
+            display: flex;
             opacity: 1;
-            transform: translateX(0);
-            border: 1px solid var(--glass-border);
+            /* Width is fixed now, no animation on width */
         }
 
         .inspector-header {
-            padding: 20px;
+            padding: 15px 20px;
             border-bottom: 1px solid var(--glass-border);
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: rgba(0,0,0,0.1);
+            /* CRITICAL: Enable dragging cursor */
+            cursor: move; 
+            user-select: none;
         }
 
         .inspector-header h3 {
@@ -354,6 +365,7 @@
             transition: color 0.2s;
             font-size: 1.2rem;
             padding: 5px;
+            /* Prevent dragging when clicking close button logic handled in JS */
         }
         .close-inspector:hover { color: var(--text-main); }
 
@@ -834,7 +846,7 @@
             <div id="snapshotFlash" class="snapshot-flash"></div>
         </div>
 
-        <!-- NEW: DATA INSPECTOR SIDEBAR -->
+        <!-- NEW: DATA INSPECTOR SIDEBAR (Now Movable) -->
         <div id="dataInspector" class="data-inspector">
             <div class="inspector-header">
                 <div>
@@ -1432,6 +1444,68 @@
         handleFile(e.dataTransfer.files[0]); 
     });
     fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+    // --- NEW: DRAGGABLE FUNCTIONALITY ---
+    function makeDraggable(elmnt) {
+      var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      const header = elmnt.querySelector(".inspector-header");
+      
+      if (header) {
+        header.onmousedown = dragMouseDown;
+      }
+
+      function dragMouseDown(e) {
+        // Prevent dragging if clicking the close button or icon
+        if(e.target.closest('.close-inspector')) return;
+        
+        e = e || window.event;
+        e.preventDefault();
+        // get the mouse cursor position at startup:
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        // calculate the new cursor position:
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        
+        // set the element's new position:
+        
+        // Check if we are currently using 'right' positioning and switch to 'left'
+        // This is needed because CSS sets 'right' initially, but dragging relies on 'left'
+        if(elmnt.style.right && elmnt.style.right !== 'auto') {
+            const rect = elmnt.getBoundingClientRect();
+            // Get position relative to parent
+            const parentRect = elmnt.offsetParent ? elmnt.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
+            elmnt.style.left = (rect.left - parentRect.left) + "px";
+            elmnt.style.right = 'auto'; // Disable right so left takes over
+        } else if (!elmnt.style.left) {
+             // If neither is set explicitly in inline style (first drag)
+            const rect = elmnt.getBoundingClientRect();
+            const parentRect = elmnt.offsetParent ? elmnt.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
+            elmnt.style.left = (rect.left - parentRect.left) + "px";
+            elmnt.style.right = 'auto';
+        }
+
+        elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+        elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+      }
+
+      function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+      }
+    }
+
+    // Initialize Draggable for the Data Inspector
+    makeDraggable(document.getElementById("dataInspector"));
 
     drawChart({ time: [], datasets: {} });
 </script>
