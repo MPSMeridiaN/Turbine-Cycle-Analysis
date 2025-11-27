@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbine Analytics Suite v2.9</title>
+    <title>Turbine Analytics Suite v3.0 (Flexible Date)</title>
     <!-- Load Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <!-- Font Awesome for Icons -->
@@ -122,6 +122,29 @@
         }
 
         /* --- INPUT SECTION --- */
+        .input-controls {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+            gap: 15px;
+        }
+
+        .date-format-selector {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+        
+        .date-format-selector:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
         .input-section {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -297,12 +320,10 @@
             border-radius: 8px;
         }
 
-        /* --- NEW: FLOATING DATA INSPECTOR (UPDATED) --- */
+        /* --- FLOATING DATA INSPECTOR --- */
         .data-inspector {
             width: 320px;
-            /* Remove sidebar-specific styles */
-            /* bottom: 0; */
-            max-height: 80vh; /* Don't be too tall */
+            max-height: 80vh; 
             overflow: hidden;
             
             background: var(--panel-bg);
@@ -311,18 +332,16 @@
             border: 1px solid var(--glass-border);
             border-radius: 12px;
             
-            /* Positioning as floating element */
             position: absolute;
-            top: 70px; /* Initial Top */
-            right: 30px; /* Initial Right */
+            top: 70px;
+            right: 30px; 
             z-index: 60;
             
             box-shadow: 0 15px 40px var(--shadow-color);
             
-            display: none; /* Hidden by default */
+            display: none; 
             flex-direction: column;
             
-            /* Fade animation only, no slide */
             opacity: 0;
             transition: opacity 0.3s ease;
         }
@@ -330,7 +349,6 @@
         .data-inspector.active {
             display: flex;
             opacity: 1;
-            /* Width is fixed now, no animation on width */
         }
 
         .inspector-header {
@@ -340,7 +358,6 @@
             justify-content: space-between;
             align-items: center;
             background: rgba(0,0,0,0.1);
-            /* CRITICAL: Enable dragging cursor */
             cursor: move; 
             user-select: none;
         }
@@ -365,7 +382,6 @@
             transition: color 0.2s;
             font-size: 1.2rem;
             padding: 5px;
-            /* Prevent dragging when clicking close button logic handled in JS */
         }
         .close-inspector:hover { color: var(--text-main); }
 
@@ -605,7 +621,7 @@
             align-items: start; /* Prevent stretch height */
         }
 
-        /* --- NEW LEGEND ITEM STRUCTURE --- */
+        /* --- LEGEND ITEM STRUCTURE --- */
         .legend-card {
             background: rgba(125,125,125,0.05);
             color: var(--text-main);
@@ -668,7 +684,7 @@
         .legend-card.hidden-item .legend-name { opacity: 0.5; text-decoration: line-through; }
         .legend-card.hidden-item .legend-color-dot { background: #777 !important; }
 
-        /* Settings Panel (Hidden by default) */
+        /* Settings Panel */
         .legend-settings-panel {
             background: rgba(0,0,0,0.2);
             padding: 10px;
@@ -809,6 +825,16 @@
         <p class="subtitle">Interactive Performance Visualization</p>
     </header>
 
+    <!-- NEW: Date Format Selector -->
+    <div class="input-controls">
+        <select id="dateFormatSelect" class="date-format-selector">
+            <option value="auto">📅 Auto-Detect Date Format</option>
+            <option value="dmy">Day / Month / Year (e.g., 31/01/2024)</option>
+            <option value="mdy">Month / Day / Year (e.g., 01/31/2024)</option>
+            <option value="ymd">Year / Month / Day (e.g., 2024/01/31)</option>
+        </select>
+    </div>
+
     <!-- INPUT SECTION -->
     <div class="input-section">
         <div class="upload-area" id="dropZone">
@@ -846,7 +872,7 @@
             <div id="snapshotFlash" class="snapshot-flash"></div>
         </div>
 
-        <!-- NEW: DATA INSPECTOR SIDEBAR (Now Movable) -->
+        <!-- FLOATING DATA INSPECTOR -->
         <div id="dataInspector" class="data-inspector">
             <div class="inspector-header">
                 <div>
@@ -856,7 +882,6 @@
                 <div class="close-inspector" id="closeInspector"><i class="fas fa-times"></i></div>
             </div>
             <div class="inspector-body" id="inspectorContent">
-                <!-- Rows injected here -->
                 <div style="padding:20px; text-align:center; color:var(--text-muted);">
                     Click on the chart to view full dataset details for that timestamp.
                 </div>
@@ -920,7 +945,7 @@
         }
     });
 
-    // --- HELPER: FORMAT DATE TO LOCAL STRING (Preserves Face Value) ---
+    // --- HELPER: FORMAT DATE TO LOCAL STRING ---
     function formatDateToLocalString(date) {
         const pad = (num) => (num < 10 ? '0' : '') + num;
         return date.getFullYear() +
@@ -931,61 +956,105 @@
             ':' + pad(date.getSeconds());
     }
 
-    // --- HELPER: ROBUST DATE PARSER (Handles DD/MM/YYYY vs YYYY/MM/DD) ---
-    function parseDateSmart(str) {
+    // --- NEW: ADVANCED DATE PARSER (FLEXIBLE) ---
+    function parseDateSmart(str, formatHint) {
         if(!str) return null;
-        const cleanStr = str.replace(/"/g, '').trim();
-        
-        // Split Date and Time
+        // Clean cleanup: Remove quotes, double spaces
+        const cleanStr = str.replace(/["']/g, '').trim().replace(/\s+/g, ' ');
+
+        // Try standard ISO parsing first (YYYY-MM-DD or YYYY/MM/DD)
+        // This usually works for standard DB outputs
+        const isoTry = new Date(cleanStr);
+        if (!isNaN(isoTry.getTime()) && cleanStr.match(/^\d{4}/)) {
+            return isoTry;
+        }
+
+        // Split date and time
+        // Separators: T, space
         const parts = cleanStr.split(/[\sT]+/);
         const datePart = parts[0];
         const timePart = parts[1] || "00:00:00";
-        
-        // Manual Parsing for DD-MM-YY or DD/MM/YY (common in Thailand/Excel)
-        // Checks for either '/' or '-' separator
-        if (datePart.includes('/') || datePart.includes('-')) {
-            const separator = datePart.includes('/') ? '/' : '-';
-            const dComps = datePart.split(separator).map(Number);
-            const tComps = timePart.split(':').map(Number);
 
-            // Case 1: YYYY-MM-DD (Year at start)
-            // If the first number is > 31, it MUST be a year.
+        // Parse Time
+        const tComps = timePart.split(':').map(Number);
+        const hh = tComps[0] || 0;
+        const mm = tComps[1] || 0;
+        const ss = tComps[2] || 0;
+
+        // Parse Date - Handle /, -, . separators
+        const dComps = datePart.split(/[\/\-\.]/).map(Number);
+        if (dComps.length < 3) return null; // Invalid date part
+
+        let day, month, year;
+
+        // Logic based on formatHint
+        if (formatHint === 'ymd') {
+            year = dComps[0];
+            month = dComps[1];
+            day = dComps[2];
+        } else if (formatHint === 'mdy') {
+            month = dComps[0];
+            day = dComps[1];
+            year = dComps[2];
+        } else if (formatHint === 'dmy') {
+            day = dComps[0];
+            month = dComps[1];
+            year = dComps[2];
+        } else {
+            // AUTO DETECTION LOGIC
+            // Case 1: YYYY-MM-DD (Year is first and > 31)
             if (dComps[0] > 31) {
-                 // dComps[0] = Year, dComps[1] = Month, dComps[2] = Day
-                 return new Date(dComps[0], dComps[1] - 1, dComps[2], tComps[0]||0, tComps[1]||0, tComps[2]||0);
-            }
-            
-            // Case 2: DD-MM-YYYY or DD-MM-YY (Day at start)
-            // Condition: Year at end is explicit (e.g. 2025) OR Day > 12 (ambiguity resolver vs MM-DD-YYYY)
-            // Or simply fallback to this if Case 1 didn't match and it has 3 parts
-            if (dComps.length === 3) {
-                 let year = dComps[2];
-                 if(year < 100) year += 2000; // Handle YY -> 20YY
-                 
-                 // dComps[0] = Day, dComps[1] = Month, dComps[2] = Year
-                 return new Date(year, dComps[1] - 1, dComps[0], tComps[0]||0, tComps[1]||0, tComps[2]||0);
+                year = dComps[0];
+                month = dComps[1];
+                day = dComps[2];
+            } 
+            // Case 2: Date ends with Year (DD-MM-YYYY or MM-DD-YYYY)
+            else {
+                // Try to infer Day vs Month
+                const p1 = dComps[0];
+                const p2 = dComps[1];
+                const p3 = dComps[2];
+
+                year = p3;
+                
+                // If 2nd part > 12, it MUST be Day => MM/DD/YYYY
+                if (p2 > 12) {
+                    month = p1;
+                    day = p2;
+                }
+                // If 1st part > 12, it MUST be Day => DD/MM/YYYY
+                else if (p1 > 12) {
+                    day = p1;
+                    month = p2;
+                }
+                // Ambiguous Case (e.g. 1/2/2024)
+                // Default to DD/MM/YYYY (Common in TH/UK/EU)
+                else {
+                    day = p1;
+                    month = p2;
+                }
             }
         }
-        
-        // Fallback to Native Parser
-        const normalized = cleanStr.replace(/-/g, '/');
-        const d = new Date(normalized);
-        if (!isNaN(d.getTime())) {
-            return d;
-        }
-        
-        return null;
+
+        // Year Correction (YY -> YYYY)
+        if (year < 100) year += 2000;
+
+        // Validate
+        if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+        return new Date(year, month - 1, day, hh, mm, ss);
     }
 
-    // --- PARSE LOGIC (UPDATED FOR EXCEL COPY-PASTE) ---
+    // --- PARSE CSV ---
     function parseCSV(data) {
         const lines = data.split('\n').filter(line => line.trim() !== "");
         if (lines.length === 0) return { time: [], datasets: {} };
 
-        // --- Improved Delimiter Detection (Score-based) ---
-        let tabCount = 0;
-        let commaCount = 0;
-        let semiCount = 0;
+        // Get User Preference
+        const formatHint = document.getElementById('dateFormatSelect').value;
+
+        // Delimiter Detection
+        let tabCount = 0, commaCount = 0, semiCount = 0;
         const limit = Math.min(lines.length, 5);
         for(let i=0; i<limit; i++) {
             const line = lines[i];
@@ -993,50 +1062,39 @@
             commaCount += (line.match(/,/g) || []).length;
             semiCount += (line.match(/;/g) || []).length;
         }
-        // Prioritize Tab (Excel) -> Comma (CSV) -> Semicolon
         let splitter = ',';
         if (tabCount >= commaCount && tabCount >= semiCount && tabCount > 0) splitter = '\t';
         else if (semiCount > commaCount && semiCount > tabCount) splitter = ';';
 
-        // --- Metadata & Header Detection ---
+        // Header Detection
         let unitRowIndex = -1;
         let nameRowIndex = -1;
         
-        // Look for specific keywords to identify rows
         for (let i = 0; i < Math.min(lines.length, 15); i++) {
             const row = lines[i].split(splitter);
             const firstCell = row[0].replace(/["']/g, '').trim().toLowerCase();
             if (firstCell === 'unit') unitRowIndex = i;
-            // Priority: Name > Tag. If 'name' is found, lock it.
-            if (firstCell === 'name') {
-                nameRowIndex = i;
-            } else if (firstCell === 'tag' && nameRowIndex === -1) {
-                nameRowIndex = i; 
-            } else if ((firstCell === 'timestamp' || firstCell === 'date' || firstCell === 'time') && nameRowIndex === -1) {
+            if (firstCell === 'name' || (firstCell === 'tag' && nameRowIndex === -1) || 
+               ((firstCell === 'timestamp' || firstCell === 'date' || firstCell === 'time') && nameRowIndex === -1)) {
                 nameRowIndex = i;
             }
         }
         
-        // --- Fallback: Headerless Data Detection ---
         let headers = [];
         let units = [];
         let dataStartIndex = 0;
 
         if (nameRowIndex === -1) {
-            // Check if first cell of first row is a valid date
+            // Check if first row is data
             const firstRow = lines[0].split(splitter);
-            const testDate = parseDateSmart(firstRow[0]);
+            const testDate = parseDateSmart(firstRow[0], formatHint);
             
             if (testDate && !isNaN(testDate.getTime())) {
-                // It is data! Generate generic headers
-                nameRowIndex = -1; // Flag as no header
+                nameRowIndex = -1;
                 dataStartIndex = 0;
                 headers = ["Timestamp"];
-                for(let j=1; j<firstRow.length; j++) {
-                    headers.push(`Column ${j}`);
-                }
+                for(let j=1; j<firstRow.length; j++) headers.push(`Column ${j}`);
             } else {
-                // Assume row 0 is header even if not recognized
                 nameRowIndex = 0;
                 dataStartIndex = 1;
             }
@@ -1044,11 +1102,9 @@
             dataStartIndex = nameRowIndex + 1;
         }
 
-        // --- Build Headers ---
         if (nameRowIndex !== -1) {
             const names = lines[nameRowIndex].trim().split(splitter).map(h => h.replace(/"/g, '').trim());
             if (unitRowIndex !== -1) units = lines[unitRowIndex].trim().split(splitter).map(u => u.replace(/"/g, '').trim());
-
             const headerCounts = {}; 
             headers = names.map((name, i) => {
                 let label = name || `Col ${i}`;
@@ -1058,9 +1114,7 @@
             });
         }
 
-        // --- Parse Data ---
         const result = { time: [], datasets: {} };
-        // Initialize dataset arrays (skip index 0 which is Time)
         for (let i = 1; i < headers.length; i++) if(headers[i]) result.datasets[headers[i]] = [];
 
         const dataRows = lines.slice(dataStartIndex);
@@ -1070,20 +1124,20 @@
 
         dataRows.forEach((rowStr) => {
             const cols = rowStr.split(splitter);
-            // Relaxed check: Accept if at least 1 column exists (Timestamp)
             if (cols.length < 1) return; 
             
             const baseTimeStr = cols[0].replace(/"/g, '').trim();
             if (!baseTimeStr) return;
 
-            if (baseTimeStr === lastBaseTimeStr) secondOffset += 10;
+            // Simple millisecond handler for duplicate timestamps
+            if (baseTimeStr === lastBaseTimeStr) secondOffset += 1; // Increment just 1 sec/ms not 10
             else { secondOffset = 0; lastBaseTimeStr = baseTimeStr; }
 
             try {
-                let dateObj = parseDateSmart(baseTimeStr);
+                let dateObj = parseDateSmart(baseTimeStr, formatHint);
                 
                 if (dateObj) {
-                    dateObj.setSeconds(dateObj.getSeconds() + secondOffset);
+                    if (secondOffset > 0) dateObj.setSeconds(dateObj.getSeconds() + secondOffset);
                     result.time.push(formatDateToLocalString(dateObj));
                     validRows++;
                 } else {
@@ -1099,17 +1153,15 @@
             }
         });
         
-        console.log(`Parsed ${validRows} rows. Splitter: '${splitter === '\t' ? 'TAB' : splitter}'. Headers: ${headers.join(', ')}`);
+        console.log(`Parsed ${validRows} rows.`);
         return result;
     }
 
     // --- CHART RENDER ---
     function drawChart(parsedData) {
         if (!parsedData || parsedData.time.length === 0) {
-            // Optional: Show error if paste resulted in empty data
-            // But verify it wasn't just an empty initial call
             if(parsedData && document.getElementById('pasteInput').value.trim().length > 0) {
-                 alert("Could not parse data. Please check if your Excel data includes a Timestamp column.");
+                 alert("Could not parse data. Check Date Format setting.");
             }
             return;
         }
@@ -1140,7 +1192,6 @@
                     connectgaps: true 
                 });
 
-                // Store initial config
                 legendItemsData.push({ 
                     name: name, 
                     color: traceColor, 
@@ -1162,7 +1213,6 @@
             xaxis: {
                 gridcolor: currentTheme === 'dark' ? '#334155' : '#cbd5e1',
                 showspikes: false, 
-                rangeslider: { visible: false }
             },
             yaxis: {
                 title: 'Main Units',
@@ -1193,7 +1243,6 @@
             Plotly.relayout(chartDiv, { 'xaxis.autorange': true, 'yaxis.autorange': true, 'yaxis2.autorange': true });
         };
 
-        // --- SNAPSHOT FEATURE (SIMPLE - No Annotations) ---
         document.getElementById('snapshotBtn').onclick = async function() {
             const flash = document.getElementById('snapshotFlash');
             flash.classList.add('active');
@@ -1302,7 +1351,7 @@
 
     function formatVal(v) { return typeof v === 'number' ? v.toFixed(2) : v; }
 
-    // --- LEGEND LOGIC (NEW: With Customization) ---
+    // --- LEGEND LOGIC ---
     function buildCustomLegend(items, chartDiv) {
         const container = document.getElementById('customLegend');
         container.innerHTML = ''; 
@@ -1313,22 +1362,11 @@
 
         items.forEach(item => {
             const match = item.name.match(/^(.*?)\s*\(([^)]+)\)$/);
-            
             let cleanName = item.name;
             let category = "General / No Unit";
-
-            if (match) {
-                cleanName = match[1].trim(); 
-                category = match[2].trim(); 
-            }
-
-            if (!groups[category]) {
-                groups[category] = [];
-            }
-            groups[category].push({
-                ...item,
-                cleanName: cleanName
-            });
+            if (match) { cleanName = match[1].trim(); category = match[2].trim(); }
+            if (!groups[category]) groups[category] = [];
+            groups[category].push({ ...item, cleanName: cleanName });
         });
 
         const sortedCategories = Object.keys(groups).sort((a, b) => a.localeCompare(b));
@@ -1350,12 +1388,10 @@
             grid.style.padding = '0'; 
             
             groupItems.forEach(item => {
-                // Card Wrapper
                 const card = document.createElement('div');
                 card.className = 'legend-card';
                 card.dataset.name = item.cleanName.toLowerCase();
 
-                // Header (Click to toggle visibility)
                 const cardHeader = document.createElement('div');
                 cardHeader.className = 'legend-card-header';
                 
@@ -1373,7 +1409,6 @@
                 infoDiv.appendChild(colorDot);
                 infoDiv.appendChild(nameSpan);
 
-                // Settings Toggle Icon
                 const settingsBtn = document.createElement('i');
                 settingsBtn.className = 'fas fa-cog legend-settings-btn';
                 settingsBtn.title = 'Customize Line';
@@ -1381,11 +1416,9 @@
                 cardHeader.appendChild(infoDiv);
                 cardHeader.appendChild(settingsBtn);
 
-                // Settings Panel
                 const settingsPanel = document.createElement('div');
                 settingsPanel.className = 'legend-settings-panel';
                 
-                // Color Control
                 const colorRow = document.createElement('div');
                 colorRow.className = 'setting-row';
                 colorRow.innerHTML = `<span>Color</span>`;
@@ -1394,7 +1427,6 @@
                 colorInput.value = item.color;
                 colorRow.appendChild(colorInput);
 
-                // Style Control
                 const styleRow = document.createElement('div');
                 styleRow.className = 'setting-row';
                 styleRow.innerHTML = `<span>Style</span>`;
@@ -1415,16 +1447,12 @@
                 card.appendChild(cardHeader);
                 card.appendChild(settingsPanel);
 
-                // --- EVENTS ---
-                // 1. Toggle Trace Visibility
                 cardHeader.onclick = (e) => {
-                    // Ignore clicks on settings button or within settings panel
                     if (e.target === settingsBtn || settingsPanel.contains(e.target)) return;
-
                     const isHidden = card.classList.contains('hidden-item');
                     if(isHidden) {
                         card.classList.remove('hidden-item');
-                        colorDot.style.background = colorInput.value; // Use current picker value
+                        colorDot.style.background = colorInput.value; 
                         Plotly.restyle(chartDiv, {visible: true}, [item.index]);
                     } else {
                         card.classList.add('hidden-item');
@@ -1433,45 +1461,23 @@
                     }
                 };
 
-                // 2. Toggle Settings Panel
-                settingsBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    settingsPanel.classList.toggle('open');
-                };
-
-                // 3. Change Color
-                colorInput.oninput = (e) => {
-                    e.stopPropagation();
-                    const newColor = e.target.value;
-                    item.color = newColor; // Update data model
-                    if(!card.classList.contains('hidden-item')) {
-                         colorDot.style.background = newColor;
-                    }
-                    Plotly.restyle(chartDiv, {'line.color': newColor}, [item.index]);
-                };
+                settingsBtn.onclick = (e) => { e.stopPropagation(); settingsPanel.classList.toggle('open'); };
+                colorInput.oninput = (e) => { e.stopPropagation(); const newColor = e.target.value; item.color = newColor; if(!card.classList.contains('hidden-item')) { colorDot.style.background = newColor; } Plotly.restyle(chartDiv, {'line.color': newColor}, [item.index]); };
                 colorInput.onclick = (e) => e.stopPropagation();
-
-                // 4. Change Line Style
-                styleSelect.onchange = (e) => {
-                    e.stopPropagation();
-                    const newDash = e.target.value;
-                    Plotly.restyle(chartDiv, {'line.dash': newDash}, [item.index]);
-                };
+                styleSelect.onchange = (e) => { e.stopPropagation(); const newDash = e.target.value; Plotly.restyle(chartDiv, {'line.dash': newDash}, [item.index]); };
                 styleSelect.onclick = (e) => e.stopPropagation();
 
                 grid.appendChild(card);
                 elements.push({card, item, colorDot, colorInput});
             });
-
             groupBlock.appendChild(grid);
             container.appendChild(groupBlock);
         });
 
-        // Search
+        // Search, Select All, Deselect All (Re-attach Logic)
         const searchInput = document.getElementById('legendSearch');
         const newSearchInput = searchInput.cloneNode(true);
         searchInput.parentNode.replaceChild(newSearchInput, searchInput);
-
         newSearchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
             elements.forEach(obj => {
@@ -1484,11 +1490,9 @@
             });
         });
 
-        // Select All
         const oldSelectBtn = document.getElementById('selectAllBtn');
         const newSelectBtn = oldSelectBtn.cloneNode(true);
         oldSelectBtn.parentNode.replaceChild(newSelectBtn, oldSelectBtn);
-
         newSelectBtn.onclick = () => {
             const indices = [];
             elements.forEach(obj => {
@@ -1499,11 +1503,9 @@
             Plotly.restyle(chartDiv, {visible: true}, indices);
         };
 
-        // Deselect All
         const oldDeselectBtn = document.getElementById('deselectAllBtn');
         const newDeselectBtn = oldDeselectBtn.cloneNode(true);
         oldDeselectBtn.parentNode.replaceChild(newDeselectBtn, oldDeselectBtn);
-
         newDeselectBtn.onclick = () => {
             const indices = [];
             elements.forEach(obj => {
@@ -1515,10 +1517,9 @@
         };
     }
 
-    // --- GENERIC UI ---
+    // --- UI/UX & DRAG ---
     const modal = document.getElementById('legendModal');
     document.getElementById('openLegendBtn').onclick = () => { modal.classList.add('show'); document.body.style.overflow = 'hidden'; }
-    
     const closeModal = () => { modal.classList.remove('show'); document.body.style.overflow = ''; }
     document.querySelector('.close-modal').onclick = closeModal;
     window.onclick = (e) => { if (e.target == modal) closeModal(); }
@@ -1530,7 +1531,6 @@
         if (!file) return;
         document.getElementById('loader').style.display = 'block';
         document.getElementById('mainChart').style.opacity = '0.3';
-        
         setTimeout(() => {
             const reader = new FileReader();
             reader.onload = function(event) {
@@ -1556,74 +1556,41 @@
 
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
-    dropZone.addEventListener('drop', (e) => { 
-        e.preventDefault(); dropZone.classList.remove('dragover'); 
-        handleFile(e.dataTransfer.files[0]); 
-    });
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
     fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
-    // --- NEW: DRAGGABLE FUNCTIONALITY ---
     function makeDraggable(elmnt) {
       var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
       const header = elmnt.querySelector(".inspector-header");
-      
-      if (header) {
-        header.onmousedown = dragMouseDown;
-      }
-
+      if (header) header.onmousedown = dragMouseDown;
       function dragMouseDown(e) {
-        // Prevent dragging if clicking the close button or icon
         if(e.target.closest('.close-inspector')) return;
-        
-        e = e || window.event;
-        e.preventDefault();
-        // get the mouse cursor position at startup:
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
+        e = e || window.event; e.preventDefault();
+        pos3 = e.clientX; pos4 = e.clientY;
+        document.onmouseup = closeDragElement; document.onmousemove = elementDrag;
       }
-
       function elementDrag(e) {
-        e = e || window.event;
-        e.preventDefault();
-        // calculate the new cursor position:
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        
-        // set the element's new position:
-        
-        // Check if we are currently using 'right' positioning and switch to 'left'
-        // This is needed because CSS sets 'right' initially, but dragging relies on 'left'
+        e = e || window.event; e.preventDefault();
+        pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY;
+        pos3 = e.clientX; pos4 = e.clientY;
         if(elmnt.style.right && elmnt.style.right !== 'auto') {
             const rect = elmnt.getBoundingClientRect();
-            // Get position relative to parent
             const parentRect = elmnt.offsetParent ? elmnt.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
             elmnt.style.left = (rect.left - parentRect.left) + "px";
-            elmnt.style.right = 'auto'; // Disable right so left takes over
+            elmnt.style.right = 'auto'; 
         } else if (!elmnt.style.left) {
-             // If neither is set explicitly in inline style (first drag)
             const rect = elmnt.getBoundingClientRect();
             const parentRect = elmnt.offsetParent ? elmnt.offsetParent.getBoundingClientRect() : document.body.getBoundingClientRect();
             elmnt.style.left = (rect.left - parentRect.left) + "px";
             elmnt.style.right = 'auto';
         }
-
         elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
         elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
       }
-
-      function closeDragElement() {
-        document.onmouseup = null;
-        document.onmousemove = null;
-      }
+      function closeDragElement() { document.onmouseup = null; document.onmousemove = null; }
     }
 
-    // Initialize Draggable for the Data Inspector
     makeDraggable(document.getElementById("dataInspector"));
-
     drawChart({ time: [], datasets: {} });
 </script>
 </body>
